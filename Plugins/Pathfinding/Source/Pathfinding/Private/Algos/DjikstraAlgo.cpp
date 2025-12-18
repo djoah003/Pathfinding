@@ -18,6 +18,9 @@ void ADjikstraAlgo::BeginPlay()
 {
 	Super::BeginPlay();
 
+	StartPosition = FIntVector2(FMath::RandRange(0, GridSize.X - 1), FMath::RandRange(0, GridSize.Y - 1));
+	TargetPosition = FIntVector2(FMath::RandRange(0, GridSize.X - 1), FMath::RandRange(0, GridSize.Y - 1));
+	
 	FActorSpawnParameters SpawnParams;
 	for (int X = 0; X < GridSize.X; ++X)
 	{
@@ -27,10 +30,11 @@ void ADjikstraAlgo::BeginPlay()
 			NewPoint.SetCoordinates(FVector2D(X, Y));
 			NewPoint.SetCost(INT_MAX);
 			Grid.Emplace(NewPoint);			
-			int Index = GridActors.Emplace(GetWorld()->SpawnActor<AWaypointActor>(WaypointBP, NewPoint.GetFCoordinates() * SpawnOffset, FRotator::ZeroRotator, SpawnParams));
+			int Index = GridActors.Emplace(GetWorld()->SpawnActor<AWaypointActor>(WaypointBP, FVector(X, Y, 0) * SpawnOffset, FRotator::ZeroRotator, SpawnParams));
 			if (X == StartPosition.X && Y == StartPosition.Y)
 			{
 				Grid[Index].SetCost(0);
+				GridActors[Index]->UpdateCost(0);
 				GridActors[Index]->GetMesh()->SetMaterial(0, StartMat);
 			}
 			if (X == TargetPosition.X && Y == TargetPosition.Y) GridActors[Index]->GetMesh()->SetMaterial(0, TargetMat);
@@ -46,75 +50,82 @@ void ADjikstraAlgo::BeginPlay()
 
 void ADjikstraAlgo::CalculateGridCost()
 {
-	Unvisited = Grid;
+	for (int i = 0; i < Grid.Num(); ++i) Unvisited.Add(i);
 	while (Unvisited.Num() > 0)
 	{
-		int MinCost = GetMinCost(Unvisited);
-		FWaypoint Point;
-		GetWaypoint(Point, Unvisited, MinCost);
-		Unvisited.RemoveSwap(Point);
-
-		for (int X = Point.GetFCoordinates().X - 1; X < Point.GetFCoordinates().X + 1; ++X)
+		int CurrentIndex = GetMinIndex(Unvisited);
+		FWaypoint& Current = Grid[CurrentIndex];
+		Current.SetVisited(true);
+		Unvisited.Remove(CurrentIndex);
+		for (int X = Current.GetPosition().X - 1; X <= Current.GetPosition().X + 1; ++X)
 		{
-			for (int Y = Point.GetFCoordinates().Y - 1; Y < Point.GetFCoordinates().Y + 1; ++Y)
+			for (int Y = Current.GetPosition().Y - 1; Y <= Current.GetPosition().Y + 1; ++Y)
 			{
 				if (X < 0 || X > GridSize.X - 1 || Y < 0 || Y > GridSize.Y - 1) continue;
 
-				FIntVector2 NeighborPointCoords = FIntVector2(X, Y);
-				if (NeighborPointCoords == Point.GetICoordinates()) continue; // Skip checking current tile.
+				FIntVector2 NeighborPosition = FIntVector2(X, Y);
+				if (NeighborPosition == Current.GetPosition()) continue; // Skip checking current tile.
 
 				// Get Neighbor
-				int NeighborIndex; // <--- TODO: CHANGE TO INDEX
-				GetNeighbor(NeighborIndex, Unvisited, NeighborPointCoords);
-				if (NeighborIndex < 0) return;
+				int NeighborIndex = -1;
+				for (auto Index : Unvisited)
+					if (Grid[Index].GetPosition() == NeighborPosition)
+					{
+						NeighborIndex = Index;
+						break;
+					}
+				if (NeighborIndex == -1) continue;
+				FWaypoint& Neighbor = Grid[NeighborIndex];
+				if (Neighbor.Visited()) continue;
 				
-				FIntVector2 Delta = NeighborPointCoords - Point.GetICoordinates();
+				FIntVector2 Delta = NeighborPosition - Current.GetPosition();
 				Delta.X = FMath::Abs(Delta.X);
 				Delta.Y = FMath::Abs(Delta.Y);	
 				int MoveCost = (Delta.X + Delta.Y == 1) ? 10 : 14;
-				int CostToNeighbor = Point.GetCost() + MoveCost;
-				if (CostToNeighbor < Grid[NeighborIndex].GetCost())
+				int CostToNeighbor = Current.GetCost() + MoveCost;
+				if (CostToNeighbor < Neighbor.GetCost())
 				{
-					Grid[NeighborIndex].SetCost(CostToNeighbor);
-					OnCostSet.Broadcast(CostToNeighbor); // <--- TODO: CHANGE TO INTERFACE
-					Grid[NeighborIndex].SetOrigin(Point.GetICoordinates());
+					Neighbor.SetCost(CostToNeighbor);
+					GridActors[Neighbor.GetID()]->UpdateCost(CostToNeighbor);
+					Neighbor.SetOrigin(Current.GetPosition());
 				}
 			}
 		}
+		Visited.Add(CurrentIndex);
+	}
+	TraceRoute();
+}
+
+void ADjikstraAlgo::TraceRoute()
+{
+	// Find the tile that matches TargetPosition in Visited
+	FWaypoint* CurrentTile = &Grid[Visited[0]]; // default
+	if (int* FoundIndex = Visited.FindByPredicate([&](int Index) {
+			return Grid[Index].GetPosition() == TargetPosition;
+		}))
+	{
+		CurrentTile = &Grid[*FoundIndex];
+	}
+
+	// Trace back to StartPosition
+	while (CurrentTile->GetPosition() != StartPosition)
+	{
+		// Find the origin tile in Visited
+		int* Previous = Visited.FindByPredicate([&](int Index) {
+			return Grid[Index].GetPosition() == CurrentTile->GetOrigin();
+		});
+
+		if (!Previous) break; 
+
+		CurrentTile = &Grid[*Previous];
+		if (CurrentTile->GetPosition() != StartPosition) GridActors[*Previous]->GetMesh()->SetMaterial(0, PathMat);
 	}
 }
 
-void ADjikstraAlgo::GetWaypoint(FWaypoint& OutWaypoint, TArray<FWaypoint>& Waypoints, const int Cost)
+int ADjikstraAlgo::GetMinIndex(TArray<int32>& Array)
 {
-	for (auto& Point : Waypoints)
-	{
-		if (Point.GetCost() == Cost)
-		{
-			OutWaypoint = Point;
-			return;
-		}
-	}
-}
-
-void ADjikstraAlgo::GetNeighbor(FWaypoint& OutWaypoint, TArray<FWaypoint>& Waypoints, FIntVector2 Coordinates)
-{
-	for (auto& Waypoint : Waypoints)
-	{
-		if (Waypoint.GetICoordinates() == Coordinates)
-		{
-			OutWaypoint = Waypoint;
-			return;
-		}
-	}
-}
-
-int ADjikstraAlgo::GetMinCost(TArray<FWaypoint>& Waypoints)
-{
-	int Min = INT_MAX;
-	for (auto& Point : Waypoints)
-	{
-		const int Cost = Point.GetCost();
-		if (Cost < Min) Min = Cost;
-	}
-	return Min;
+	int MinIndex = Array[0];
+	for (auto Index : Array)
+		if (Grid[MinIndex].GetCost() > Grid[Index].GetCost()) MinIndex = Index;
+	return MinIndex;
 }

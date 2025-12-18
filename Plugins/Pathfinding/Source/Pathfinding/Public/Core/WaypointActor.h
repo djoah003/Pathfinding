@@ -16,6 +16,10 @@ public:
 	AWaypointActor();
 
 	UStaticMeshComponent* GetMesh() { return Mesh; }
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintNativeEvent)
+	void UpdateCost(int InCost);
+
 private:
 	UPROPERTY(EditAnywhere)
 	TObjectPtr<UStaticMeshComponent> Mesh;

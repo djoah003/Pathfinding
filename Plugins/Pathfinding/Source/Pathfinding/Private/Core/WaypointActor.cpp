@@ -13,5 +13,9 @@ AWaypointActor::AWaypointActor()
 	RootComponent = Mesh = CreateDefaultSubobject<UStaticMeshComponent>("Mesh");
 }
 
+void AWaypointActor::UpdateCost_Implementation(int InCost)
+{
+}
+
 
 

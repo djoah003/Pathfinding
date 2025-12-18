@@ -11,36 +11,25 @@ static FColor START = FColor::Green;
 static FColor TARGET = FColor::Red;
 static FColor EDGE = FColor::Magenta;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCostChangedSignature, int, NewCost);
-
 USTRUCT()
 struct FWaypoint
 {
 	GENERATED_BODY()
 public:
+	FWaypoint() = default;
 	void SetCost(const int NewCost) { Cost = NewCost; }
 	int GetCost() const { return Cost; }
+	FIntVector2 GetOrigin() const { return Previous; }
+	bool Visited() const { return IsVisited; }
 
 	void SetID(const int NewID) { ID = NewID; }
 	int GetID() const { return ID; }
 	
-	void SetCoordinates(const FVector2D& NewCoords)
-	{
-		Coordinates = FIntVector2(FMath::FloorToInt(NewCoords.X), FMath::FloorToInt(NewCoords.Y));
-	}
-	void SetOrigin(const FIntVector2& NewCoords)
-	{
-		Previous = NewCoords;
-	}
+	void SetCoordinates(const FVector2D& NewCoords) { Coordinates = FIntVector2(FMath::FloorToInt(NewCoords.X), FMath::FloorToInt(NewCoords.Y)); }
+	void SetOrigin(const FIntVector2& NewCoords){ Previous = NewCoords; }
+	void SetVisited(const bool Value) { IsVisited = Value; } 
 	
-	FVector GetFCoordinates() const { return FVector(Coordinates.X, Coordinates.Y, 0); }
-	FIntVector2 GetICoordinates() const { return Coordinates; }
-
-	
-	bool operator==(const FWaypoint& Other) const
-	{
-		return ID == Other.ID;
-	}
+	FIntVector2 GetPosition() const { return Coordinates; }
 private:
 	FIntVector2 Coordinates = {-1, -1};
 	FIntVector2 Previous = {-1, -1};
@@ -59,18 +48,16 @@ public:
 	ADjikstraAlgo();
 	virtual void BeginPlay() override;
 	void CalculateGridCost();
+	void TraceRoute();
 private:
-	static void GetWaypoint(FWaypoint& OutWaypoint, TArray<FWaypoint>& Waypoints, int Cost);
-	static void GetNeighbor(FWaypoint& OutWaypoint, TArray<FWaypoint>& Waypoints, FIntVector2 Coordinates);
-	static int GetMinCost(TArray<FWaypoint>& Waypoints);
+	int GetMinIndex(TArray<int32>& Array);
 
-	UPROPERTY(BlueprintAssignable)
-	FOnCostChangedSignature OnCostSet;
-	
 	UPROPERTY(EditAnywhere, Category = "SETTING|MATERIALS")
 	UMaterial* StartMat;
 	UPROPERTY(EditAnywhere, Category = "SETTING|MATERIALS")
 	UMaterial* TargetMat;
+	UPROPERTY(EditAnywhere, Category = "SETTING|MATERIALS")
+	UMaterial* PathMat;
 	
 	UPROPERTY(EditAnywhere, Category = "SETTINGS|SPAWN")
 	FIntVector2 GridSize;
@@ -89,5 +76,5 @@ private:
 	
 	TArray<FWaypoint> Grid;
 	TArray<TObjectPtr<AWaypointActor>> GridActors;
-	TArray<FWaypoint> Unvisited;
+	TArray<int32> Unvisited, Visited;
 };
