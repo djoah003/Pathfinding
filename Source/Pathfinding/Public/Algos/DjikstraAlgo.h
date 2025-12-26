@@ -6,10 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "DjikstraAlgo.generated.h"
 
-class AWaypointActor;
-static FColor START = FColor::Green;
-static FColor TARGET = FColor::Red;
-static FColor EDGE = FColor::Magenta;
+class ATileActor;
 
 USTRUCT()
 struct FWaypoint
@@ -49,6 +46,7 @@ public:
 	virtual void BeginPlay() override;
 	void CalculateGridCost();
 	void TraceRoute();
+	
 private:
 	int GetMinIndex(TArray<int32>& Array);
 
@@ -63,7 +61,7 @@ private:
 	FIntVector2 GridSize;
 
 	UPROPERTY(EditAnywhere, Category = "SETTINGS|SPAWN")
-	TSubclassOf<AWaypointActor> WaypointBP;
+	TSubclassOf<ATileActor> WaypointBP;
 	
 	UPROPERTY(EditAnywhere, Category = "SETTINGS|PATHFINDING")
 	FIntVector2 StartPosition;
@@ -75,6 +73,6 @@ private:
 	int SpawnOffset;
 	
 	TArray<FWaypoint> Grid;
-	TArray<TObjectPtr<AWaypointActor>> GridActors;
+	TArray<TObjectPtr<ATileActor>> GridActors;
 	TArray<int32> Unvisited, Visited;
 };

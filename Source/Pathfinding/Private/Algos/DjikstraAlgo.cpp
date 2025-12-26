@@ -3,7 +3,7 @@
 
 #include "Algos/DjikstraAlgo.h"
 
-#include "Core/WaypointActor.h"
+#include "Core/TileActor.h"
 
 
 // Sets default values
@@ -30,7 +30,7 @@ void ADjikstraAlgo::BeginPlay()
 			NewPoint.SetCoordinates(FVector2D(X, Y));
 			NewPoint.SetCost(INT_MAX);
 			Grid.Emplace(NewPoint);			
-			int Index = GridActors.Emplace(GetWorld()->SpawnActor<AWaypointActor>(WaypointBP, FVector(X, Y, 0) * SpawnOffset, FRotator::ZeroRotator, SpawnParams));
+			int Index = GridActors.Emplace(GetWorld()->SpawnActor<ATileActor>(WaypointBP, FVector(X, Y, 0) * SpawnOffset, FRotator::ZeroRotator, SpawnParams));
 			if (X == StartPosition.X && Y == StartPosition.Y)
 			{
 				Grid[Index].SetCost(0);
